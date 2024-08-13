@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", function() {
         apiKey: "AIzaSyDAjjHIa2ZPqQ_Ybqp-uHbOleKwTV7AQAc",
         authDomain: "lecor-f87a8.firebaseapp.com",
         projectId: "lecor-f87a8",
-        storageBucket: "lecor-f87a8.appspot.com",
+        storageBucket: "lecor-f87a8",
         messagingSenderId: "606158282239",
         appId: "1:606158282239:web:40537977bdf29e86059bca",
         measurementId: "G-21F11LBMR6",
