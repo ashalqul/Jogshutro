@@ -134,41 +134,41 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     document.getElementById('report-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const projectName = document.getElementById('project-name').value;
-        const projectType = document.getElementById('project-type').value;
-        const location = currentMarkers[0].location;
-        const description = document.getElementById('description').value;
-        const photo = document.getElementById('photo').files[0];
+    e.preventDefault();
+    const projectName = document.getElementById('project-name').value;
+    const projectType = document.getElementById('project-type').value;
+    const location = currentMarkers[0] ? currentMarkers[0].location : { lat: 0, lng: 0 }; // Default to 0,0 if no marker
+    const description = document.getElementById('description').value;
+    const photo = document.getElementById('photo').files[0];
 
-        try {
-            let photoURL = null;
-            if (photo) {
-                const storageRef = storage.ref(`project_photos/${projectName}`);
-                await storageRef.put(photo);
-                photoURL = await storageRef.getDownloadURL();
-            }
-
-            await db.collection('projects').add({
-                name: projectName,
-                type: projectType,
-                location: new firebase.firestore.GeoPoint(location.lat, location.lng),
-                description: description,
-                photoURL: photoURL
-            });
-
-            alert('Project submitted successfully!');
-            map.removeLayer(currentMarkers[0].marker);
-            currentMarkers = [];
-            markerCount = 0;
-            isMarking = true;
-            document.getElementById('mark-area-button').textContent = 'Stop Marking';
-            document.getElementById('report-form').reset();
-        } catch (error) {
-            console.error('Error adding document: ', error);
-            alert('Failed to submit project.');
+    try {
+        let photoURL = null;
+        if (photo) {
+            const storageRef = storage.ref(`project_photos/${projectName}`);
+            await storageRef.put(photo);
+            photoURL = await storageRef.getDownloadURL();
         }
-    });
+
+        await db.collection('projects').add({
+            name: projectName,
+            type: projectType,
+            location: new firebase.firestore.GeoPoint(location.lat, location.lng),
+            description: description,
+            photoURL: photoURL
+        });
+
+        alert('Project submitted successfully!');
+        map.removeLayer(currentMarkers[0].marker);
+        currentMarkers = [];
+        markerCount = 0;
+        isMarking = true;
+        document.getElementById('mark-area-button').textContent = 'Stop Marking';
+        document.getElementById('report-form').reset();
+    } catch (error) {
+        console.error('Error adding document: ', error);
+        alert('Failed to submit project.');
+    }
+});
 
     initMap();
 
