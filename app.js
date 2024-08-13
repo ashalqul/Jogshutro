@@ -78,7 +78,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const snapshot = await db.collection("projects").get();
     snapshot.forEach(doc => {
         const data = doc.data();
-        const location = data.location;
+        const location = currentMarkers.length > 0 ? currentMarkers[0].location : null;
 
         if (location && location.latitude && location.longitude) {
             const projectType = data.type;
