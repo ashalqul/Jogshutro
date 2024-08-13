@@ -18,6 +18,7 @@
         h1 {
             color: #374148;
             margin-bottom: 30px;
+            font-size: 18px;
         }
 
         #map {
@@ -246,102 +247,93 @@
         document.getElementById('locate-button').addEventListener('click', locateUser);
 
         document.getElementById('mark-area-button').addEventListener('click', () => {
-            if (markerCount >= maxMarkers) {
-                alert('You can only mark one area at a time. Please submit the current project first.');
-                return;
-            }
             isMarking = !isMarking;
             document.getElementById('mark-area-button').textContent = isMarking ? 'Stop Marking' : 'Mark Area';
         });
 
         document.getElementById('report-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+
             const projectName = document.getElementById('project-name').value;
             const projectType = document.getElementById('project-type').value;
-            const location = currentMarkers[0].location;
+            const location = document.getElementById('location').value;
             const description = document.getElementById('description').value;
-            const photo = document.getElementById('photo').files[0];
+            const fileInput = document.getElementById('photo').files[0];
 
-            try {
-                let photoURL = null;
-                if (photo) {
-                    const storageRef = storage.ref(`project_photos/${projectName}`);
-                    await storageRef.put(photo);
-                    photoURL = await storageRef.getDownloadURL();
-                }
+            let imageUrl = '';
 
-                await db.collection('projects').add({
-                    name: projectName,
-                    type: projectType,
-                    location: new firebase.firestore.GeoPoint(location.lat, location.lng),
-                    description: description,
-                    photoURL: photoURL
-                });
+            if (fileInput) {
+                const storageRef = storage.ref();
+                const fileRef = storageRef.child(`project_photos/${fileInput.name}`);
+                await fileRef.put(fileInput);
+                imageUrl = await fileRef.getDownloadURL();
+            }
 
-                alert('Project submitted successfully!');
-                map.removeLayer(currentMarkers[0].marker);
-                currentMarkers = [];
-                markerCount = 0;
-                isMarking = true;
-                document.getElementById('mark-area-button').textContent = 'Stop Marking';
-                document.getElementById('report-form').reset();
-            } catch (error) {
-                console.error('Error adding document: ', error);
-                alert('Failed to submit project.');
+            await db.collection('projects').add({
+                name: projectName,
+                type: projectType,
+                location,
+                description,
+                imageUrl,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+
+            alert('Project submitted successfully!');
+            document.getElementById('report-form').reset();
+        });
+
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                document.getElementById('login-button').style.display = 'none';
+                document.getElementById('logout-button').style.display = 'block';
+                document.getElementById('delete-account-button').style.display = 'block';
+            } else {
+                document.getElementById('login-button').style.display = 'block';
+                document.getElementById('logout-button').style.display = 'none';
+                document.getElementById('delete-account-button').style.display = 'none';
             }
         });
 
-        initMap();
-
-        // Google Login
-        const loginButton = document.getElementById('login-button');
-        const logoutButton = document.getElementById('logout-button');
-        const deleteAccountButton = document.getElementById('delete-account-button');
-
-        loginButton.addEventListener('click', () => {
+        document.getElementById('login-button').addEventListener('click', () => {
             const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider)
-                .then(result => {
-                    alert(`Logged in as ${result.user.displayName}`);
-                    loginButton.style.display = 'none';
-                    logoutButton.style.display = 'block';
-                    deleteAccountButton.style.display = 'block';
-                })
-                .catch(error => {
-                    console.error('Error during sign in:', error);
-                });
+            auth.signInWithPopup(provider).then((result) => {
+                console.log('User logged in');
+            }).catch((error) => {
+                console.error('Error logging in:', error);
+            });
         });
 
-        logoutButton.addEventListener('click', () => {
-            auth.signOut()
-                .then(() => {
-                    alert('Logged out successfully.');
-                    loginButton.style.display = 'block';
-                    logoutButton.style.display = 'none';
-                    deleteAccountButton.style.display = 'none';
-                })
-                .catch(error => {
-                    console.error('Error during sign out:', error);
-                });
+        document.getElementById('logout-button').addEventListener('click', () => {
+            auth.signOut().then(() => {
+                console.log('User logged out');
+            }).catch((error) => {
+                console.error('Error logging out:', error);
+            });
         });
 
-        deleteAccountButton.addEventListener('click', () => {
+        document.getElementById('delete-account-button').addEventListener('click', () => {
             const user = auth.currentUser;
             if (user) {
-                user.delete()
-                    .then(() => {
-                        alert('Account deleted successfully.');
-                        loginButton.style.display = 'block';
-                        logoutButton.style.display = 'none';
-                        deleteAccountButton.style.display = 'none';
-                    })
-                    .catch(error => {
-                        console.error('Error deleting account:', error);
-                    });
+                user.delete().then(() => {
+                    console.log('Account deleted');
+                }).catch((error) => {
+                    console.error('Error deleting account:', error);
+                });
             }
         });
 
+        function createChatroom(projectName) {
+            rtdb.ref(`chatrooms/${projectName}`).set({
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            });
+        }
+
+        function openChatroom(projectName) {
+            window.open(`/chatroom.html?project=${projectName}`, '_blank');
+        }
+
+        window.onload = initMap;
     </script>
 </body>
 
-  </html>
+    </html>
