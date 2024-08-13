@@ -7,7 +7,9 @@ document.addEventListener("DOMContentLoaded", function() {
         storageBucket: "lecor-f87a8.appspot.com",
         messagingSenderId: "606158282239",
         appId: "1:606158282239:web:40537977bdf29e86059bca",
-        measurementId: "G-21F11LBMR6"
+        measurementId: "G-21F11LBMR6",
+        databaseURL: "https://lecor-f87a8-default-rtdb.asia-southeast1.firebasedatabase.app/"
+    
     };
     firebase.initializeApp(firebaseConfig);
 
