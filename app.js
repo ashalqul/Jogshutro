@@ -62,7 +62,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
                 marker.getElement().appendChild(deleteButton);
 
-                currentMarkers.push({ marker, projectName, projectType, location: e.latlng });
+                currentMarkers.push({ marker, projectName, projectType, location: { lat: e.latlng.lat, lng: e.latlng.lng } });
                 markerCount++;
                 if (markerCount >= maxMarkers) {
                     isMarking = false;
