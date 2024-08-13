@@ -75,10 +75,12 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     async function loadMarkersFromFirestore() {
-        const snapshot = await db.collection("projects").get();
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const location = data.location;
+    const snapshot = await db.collection("projects").get();
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        const location = data.location;
+
+        if (location && location.latitude && location.longitude) {
             const projectType = data.type;
             const color = getProjectColor(projectType);
 
@@ -88,7 +90,10 @@ document.addEventListener("DOMContentLoaded", function() {
             }).addTo(map)
                 .bindPopup(`Project: ${data.name}<br>Type: ${data.type}<br>Description: ${data.description}<br><button onclick="openChatroom('${data.name}')">Open Chatroom</button>`)
                 .openPopup();
-        });
+        } else {
+            console.error('Invalid location data:', location);
+        }
+    });
     }
 
     function locateUser() {
