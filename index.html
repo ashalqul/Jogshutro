@@ -206,21 +206,27 @@
         }
 
         async function loadMarkersFromFirestore() {
-            const snapshot = await db.collection("projects").get();
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const location = data.location;
-                const projectType = data.type;
-                const color = getProjectColor(projectType);
+    const snapshot = await db.collection("projects").get();
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        const location = data.location;
 
-                L.circleMarker([location.latitude, location.longitude], {
-                    color: color,
-                    radius: 8
-                }).addTo(map)
-                    .bindPopup(`Project: ${data.name}<br>Type: ${data.type}<br>Description: ${data.description}<br><button onclick="openChatroom('${data.name}')">Open Chatroom</button>`)
-                    .openPopup();
-            });
+        // Check if location is valid
+        if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
+            const projectType = data.type;
+            const color = getProjectColor(projectType);
+
+            L.circleMarker([location.latitude, location.longitude], {
+                color: color,
+                radius: 8
+            }).addTo(map)
+                .bindPopup(`Project: ${data.name}<br>Type: ${data.type}<br>Description: ${data.description}<br><button onclick="openChatroom('${data.name}')">Open Chatroom</button>`)
+                .openPopup();
+        } else {
+            console.error('Invalid location data:', location);
         }
+    });
+                     }
 
         function locateUser() {
             map.locate({ setView: true, maxZoom: 16 });
