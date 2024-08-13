@@ -17,8 +17,9 @@
 
         h1 {
             color: #374148;
-            margin-bottom: 30px;
-            font-size: 18px;
+            margin-top: 72px;
+            margin-bottom: 20px;
+            font-size: 19px;
         }
 
         #map {
@@ -137,7 +138,8 @@
             storageBucket: "lecor-f87a8.appspot.com",
             messagingSenderId: "606158282239",
             appId: "1:606158282239:web:40537977bdf29e86059bca",
-            measurementId: "G-21F11LBMR6"
+            measurementId: "G-21F11LBMR6",
+            databaseURL: "https://lecor-f87a8-default-rtdb.asia-southeast1.firebasedatabase.app/"
         };
 
         firebase.initializeApp(firebaseConfig);
@@ -286,11 +288,19 @@
             if (user) {
                 document.getElementById('login-button').style.display = 'none';
                 document.getElementById('logout-button').style.display = 'block';
+document.getElementById('logout-button').style.marginTop = '5px';
+document.getElementById('logout-button').style.marginBottom = '10px';
+
                 document.getElementById('delete-account-button').style.display = 'block';
+document.getElementById('logout-button').style.marginTop = '5px'; // Adjust as needed
             } else {
                 document.getElementById('login-button').style.display = 'block';
                 document.getElementById('logout-button').style.display = 'none';
+document.getElementById('logout-button').style.marginTop = '5px';
+document.getElementById('logout-button').style.marginBottom = '10px';
+        
                 document.getElementById('delete-account-button').style.display = 'none';
+document.getElementById('delete-account-button').style.marginBottom = '5px'; // Adjust as needed               
             }
         });
 
@@ -336,4 +346,4 @@
     </script>
 </body>
 
-    </html>
+</html>
