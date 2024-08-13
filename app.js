@@ -78,13 +78,15 @@ document.addEventListener("DOMContentLoaded", function() {
     const snapshot = await db.collection("projects").get();
     snapshot.forEach(doc => {
         const data = doc.data();
-        const location = currentMarkers.length > 0 ? currentMarkers[0].location : null;
+        const location = data.location; // This should be a GeoPoint
 
-        if (location && location.latitude && location.longitude) {
+        if (location && location instanceof firebase.firestore.GeoPoint) {
+            const lat = location.latitude;
+            const lng = location.longitude;
             const projectType = data.type;
             const color = getProjectColor(projectType);
 
-            L.circleMarker([location.latitude, location.longitude], {
+            L.circleMarker([lat, lng], {
                 color: color,
                 radius: 8
             }).addTo(map)
