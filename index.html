@@ -287,10 +287,14 @@
 
             loadMarkersFromFirestore();
 
-            map.on('click', (e) => {
-                if (isMarking && markerCount < maxMarkers) {
-                    const projectName = prompt("Enter project name:");
-                    if (!projectName) return;
+                    map.on('click', (e) => {
+    if (markerCount > 0) {
+        alert("You must submit or delete your project before creating another one!");
+        return;
+    }
+    if (isMarking && markerCount < maxMarkers) {
+        const projectName = prompt("Enter project name:");
+        if (!projectName) return;
 
                     document.getElementById('project-name').value = projectName;
                     const projectType = document.getElementById('project-type').value;
