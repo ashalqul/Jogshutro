@@ -17,7 +17,7 @@
 
         h1 {
             color: #374148;
-            margin-top: 72px;
+            margin-top: 120px;
             margin-bottom: 20px;
             font-size: 19px;
         }
@@ -27,6 +27,7 @@
             height: 400px;
             border: 2px solid #374148;
             margin-bottom: 20px;
+            position: relative;
         }
 
         form {
@@ -82,20 +83,90 @@
 
         #account-buttons {
             position: absolute;
-            top: 10px;
-            left: 10px;
+            top: 50px;
+            right: 10px;
             display: none;
         }
 
-        .delete-marker-btn {
+        #project-list {
             position: absolute;
-            top: -10px;
-            right: -10px;
-            background: red;
+            top: 100px;
+            right: 10px;
+            background-color: transparent;
+            padding: 5px;
+            border-radius: 5px;
+            z-index: 1000;
+            max-width: 150px;
+        }
+
+        #user-projects {
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.5);
+            border: 1px solid #66B539;
+            color: #151B1F;
+            border-radius: 5px;
+            padding: 5px;
+            box-sizing: border-box;
+            appearance: none;
+        }
+
+        .delete-marker-btn,
+        .chatroom-btn {
+            background-color: #374148;
             color: white;
             border: none;
-            border-radius: 50%;
+            padding: 5px;
             cursor: pointer;
+            margin-right: 5px;
+            width: 80px;
+            display: inline-block;
+        }
+
+        .marker-buttons {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .chatroom-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #E8F7DD;
+            border-radius: 10px;
+            border: 2px solid #374148;
+        }
+
+        .chatroom-messages {
+            max-height: 400px;
+            overflow-y: auto;
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        .chatroom-input {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border: 1px solid #66B539;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        .chatroom-send {
+            background-color: #66B539;
+            color: #E8F7DD;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .chatroom-send:hover {
+            background-color: #4E8A2F;
         }
     </style>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
@@ -109,6 +180,11 @@
     <div id="login-button-container">
         <button id="login-button">Login with Google</button>
     </div>
+    <div id="project-list">
+        <select id="user-projects">
+            <option value="">Select your project</option>
+        </select>
+    </div>
     <h1>Want to create/request a new project?</h1>
     <div id="map"></div>
     <button id="locate-button">Locate Me</button>
@@ -118,10 +194,20 @@
         <select id="project-type" required>
             <option value="cleanup">Cleanup</option>
             <option value="calligraphy">Calligraphy</option>
+            <option value="robbery_prevention">Robbery Prevention</option>
+            <option value="extortion_prevention">Extortion Prevention</option>
+            <option value="tree_plantation">Tree Plantation</option>
         </select>
         <textarea id="description" placeholder="Description"></textarea>
         <button type="submit">Submit</button>
     </form>
+
+    <div id="chatroom-container" class="chatroom-container" style="display:none;">
+        <div class="chatroom-messages" id="chatroom-messages"></div>
+        <textarea id="chatroom-input" class="chatroom-input" placeholder="Type your message..."></textarea>
+        <button id="chatroom-send" class="chatroom-send">Send</button>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -149,7 +235,9 @@
         let isMarking = false;
         let currentMarkers = [];
         let markerCount = 0;
-        const maxMarkers = 1;
+        const maxMarkers = 3; // Each user can have up to 3 active markers
+        let userProjects = [];
+        let activeChatroom = '';
 
         function initMap() {
             map = L.map('map').setView([23.8103, 90.4125], 13);
@@ -158,12 +246,13 @@
                 attribution: '© OpenStreetMap contributors'
             }).addTo(map);
 
-            loadMarkersFromFirestore();
+            loadMarkersFromFirestore(); // Load markers on map initialization
 
             map.on('click', (e) => {
                 if (isMarking && markerCount < maxMarkers) {
                     const projectName = prompt("Enter project name:");
                     if (!projectName) return;
+
                     document.getElementById('project-name').value = projectName;
                     const projectType = document.getElementById('project-type').value;
                     const color = getProjectColor(projectType);
@@ -172,23 +261,13 @@
                         color: color,
                         radius: 8
                     }).addTo(map)
-                        .bindPopup(`Project: ${projectName}<br>Type: ${projectType}<br><button onclick="openChatroom('${projectName}')">Open Chatroom</button>`)
+                        .bindPopup(
+                            `<div>Project: ${projectName}<br>Type: ${projectType}<br>Created by: ${auth.currentUser.displayName}<br>Date: ${new Date().toLocaleString()}</div>
+                            <div class="marker-buttons">
+                                <button class="chatroom-btn" onclick="openChatroom('${projectName}')">Chatroom</button>
+                                <button class="delete-marker-btn" onclick="deleteMarker('${projectName}', this)">Delete</button>
+                            </div>`)
                         .openPopup();
-
-                    const deleteButton = document.createElement('button');
-                    deleteButton.className = 'delete-marker-btn';
-                    deleteButton.textContent = 'X';
-                    deleteButton.onclick = () => {
-                        map.removeLayer(marker);
-                        currentMarkers = currentMarkers.filter(m => m.marker !== marker);
-                        markerCount--;
-                        if (markerCount < maxMarkers) {
-                            isMarking = true;
-                            document.getElementById('mark-area-button').textContent = 'Stop Marking';
-                        }
-                    };
-
-                    marker.getElement().appendChild(deleteButton);
 
                     currentMarkers.push({ marker, projectName, projectType, location: e.latlng });
                     markerCount++;
@@ -202,24 +281,102 @@
             });
         }
 
-        async function loadMarkersFromFirestore() {
-            const snapshot = await db.collection("projects").get();
+        function getProjectColor(type) {
+            switch (type) {
+                case 'cleanup':
+                    return '#3aeb34';
+                case 'calligraphy':
+                    return '#349beb';
+                case 'robbery_prevention':
+                    return '#ff0000'; // Bright red
+                case 'extortion_prevention':
+                    return '#ffff00'; // Bright yellow
+                case 'tree_plantation':
+                    return '#006400'; // Dark green
+                default:
+                    return '#000000'; // Default to black
+            }
+        }
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                document.getElementById('login-button').style.display = 'none';
+                document.getElementById('account-buttons').style.display = 'block';
+                document.getElementById('project-list').style.display = 'block';
+
+                loadUserProjects();
+
+                document.getElementById('logout-button').addEventListener('click', () => {
+                    auth.signOut();
+                });
+
+                document.getElementById('delete-account-button').addEventListener('click', async () => {
+                    try {
+                        await deleteProjects(user.uid);
+                        await user.delete();
+                        alert('Account and associated projects deleted successfully.');
+                    } catch (error) {
+                        if (error.code === 'auth/requires-recent-login') {
+                            alert('This operation is sensitive and requires recent authentication. Logout and then login again before trying to delete your account.');
+                        } else {
+                            console.error('Error deleting account:', error);
+                        }
+                    }
+                });
+            } else {
+                document.getElementById('login-button').style.display = 'block';
+                document.getElementById('account-buttons').style.display = 'none';
+                document.getElementById('project-list').style.display = 'none';
+            }
+        });
+
+        document.getElementById('login-button').addEventListener('click', () => {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider).catch(error => {
+                console.error('Error during login:', error);
+            });
+        });
+
+        document.getElementById('locate-button').addEventListener('click', locateUser);
+
+        document.getElementById('mark-area-button').addEventListener('click', () => {
+            if (!auth.currentUser) {
+                alert('You must be logged in in order to submit');
+                return;
+            }
+            isMarking = !isMarking;
+            document.getElementById('mark-area-button').textContent = isMarking ? 'Stop Marking' : 'Mark Area';
+        });
+
+        async function loadUserProjects() {
+            const user = auth.currentUser;
+            if (!user) return;
+
+            const snapshot = await db.collection("projects").where("userId", "==", user.uid).get();
+            userProjects = [];
             snapshot.forEach(doc => {
                 const data = doc.data();
-                const location = data.location;
+                userProjects.push({ id: doc.id, name: data.name, location: data.location, type: data.type });
+            });
 
-                if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
-                    const projectType = data.type;
-                    const color = getProjectColor(projectType);
+            populateUserProjectsDropdown();
+        }
 
-                    L.circleMarker([location.latitude, location.longitude], {
-                        color: color,
-                        radius: 8
-                    }).addTo(map)
-                        .bindPopup(`Project: ${data.name}<br>Type: ${data.type}<br>Description: ${data.description}<br><button onclick="openChatroom('${data.name}')">Open Chatroom</button>`)
-                        .openPopup();
-                } else {
-                    console.error('Invalid location data:', location);
+        function populateUserProjectsDropdown() {
+            const dropdown = document.getElementById('user-projects');
+            dropdown.innerHTML = '<option value="">Select your project</option>';
+            userProjects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.id;
+                option.textContent = project.name;
+                dropdown.appendChild(option);
+            });
+
+            dropdown.addEventListener('change', () => {
+                const projectId = dropdown.value;
+                if (projectId) {
+                    const project = userProjects.find(p => p.id === projectId);
+                    map.setView([project.location.latitude, project.location.longitude], 16);
                 }
             });
         }
@@ -239,22 +396,6 @@
             });
         }
 
-        function getProjectColor(type) {
-            if (type === 'cleanup') {
-                return '#3aeb34';
-            } else if (type === 'calligraphy') {
-                return '#349beb';
-            }
-            return '#000000';
-        }
-
-        document.getElementById('locate-button').addEventListener('click', locateUser);
-
-        document.getElementById('mark-area-button').addEventListener('click', () => {
-            isMarking = !isMarking;
-            document.getElementById('mark-area-button').textContent = isMarking ? 'Stop Marking' : 'Mark Area';
-        });
-
         async function createChatroom(projectName) {
             const chatroomRef = rtdb.ref('chatrooms/' + projectName);
             chatroomRef.set({
@@ -263,12 +404,88 @@
         }
 
         function openChatroom(projectName) {
-            const chatroomURL = 'chatroom.html?project=' + encodeURIComponent(projectName);
-            window.location.href = chatroomURL;
+            activeChatroom = projectName;
+            document.getElementById('chatroom-container').style.display = 'block';
+            loadChatMessages();
+        }
+
+        function loadChatMessages() {
+            const chatroomRef = rtdb.ref('chatrooms/' + activeChatroom + '/messages');
+            chatroomRef.on('value', (snapshot) => {
+                const messages = snapshot.val();
+                const chatroomMessages = document.getElementById('chatroom-messages');
+                chatroomMessages.innerHTML = '';
+                for (let id in messages) {
+                    const message = messages[id];
+                    const messageDiv = document.createElement('div');
+                    messageDiv.textContent = `${message.sender}: ${message.text}`;
+                    chatroomMessages.appendChild(messageDiv);
+                }
+            });
+        }
+
+        document.getElementById('chatroom-send').addEventListener('click', () => {
+            const messageInput = document.getElementById('chatroom-input');
+            const messageText = messageInput.value;
+            if (messageText.trim() === '') return;
+
+            const chatroomRef = rtdb.ref('chatrooms/' + activeChatroom + '/messages');
+            const newMessageRef = chatroomRef.push();
+            newMessageRef.set({
+                sender: auth.currentUser.displayName,
+                text: messageText
+            });
+
+            messageInput.value = '';
+        });
+
+        async function loadMarkersFromFirestore() {
+            const snapshot = await db.collection("projects").get();
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const location = data.location;
+
+                if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
+                    const projectType = data.type;
+                    const color = getProjectColor(projectType);
+
+                    const marker = L.circleMarker([location.latitude, location.longitude], {
+                        color: color,
+                        radius: 8
+                    }).addTo(map)
+                        .bindPopup(
+                            `<div>Project: ${data.name}<br>Type: ${data.type}<br>Description: ${data.description}<br>Created by: ${data.userName}<br>Date: ${data.createdAt.toDate().toLocaleString()}</div>
+                            <div class="marker-buttons">
+                                <button class="chatroom-btn" onclick="openChatroom('${data.name}')">Chatroom</button>
+                                <button class="delete-marker-btn" onclick="deleteMarker('${doc.id}', this)">Delete</button>
+                            </div>`)
+                        .openPopup();
+                } else {
+                    console.error('Invalid location data:', location);
+                }
+            });
+        }
+
+        async function deleteMarker(projectId, button) {
+            if (confirm('Are you sure you want to delete your project?')) {
+                try {
+                    await db.collection("projects").doc(projectId).delete();
+                    await rtdb.ref('chatrooms/' + projectId).remove(); // Delete chatroom data
+                    const marker = button.closest('.leaflet-popup')._source;
+                    map.removeLayer(marker); // Remove marker from map
+                } catch (error) {
+                    console.error('Error deleting marker:', error);
+                }
+            }
         }
 
         document.getElementById('report-form').addEventListener('submit', async function (e) {
             e.preventDefault();
+
+            if (!auth.currentUser) {
+                alert('You must be logged in in order to submit');
+                return;
+            }
 
             const projectName = document.getElementById('project-name').value;
             const projectType = document.getElementById('project-type').value;
@@ -280,11 +497,21 @@
                 return;
             }
 
+            const userProjectsSnapshot = await db.collection("projects").where("userId", "==", auth.currentUser.uid).get();
+            if (userProjectsSnapshot.size >= maxMarkers) {
+                alert('You can only have 3 active projects');
+                return;
+            }
+
             await db.collection("projects").doc(projectName).set({
                 name: projectName,
                 type: projectType,
                 description: description,
-                location: new firebase.firestore.GeoPoint(location.lat, location.lng)
+                location: new firebase.firestore.GeoPoint(location.lat, location.lng),
+                userId: auth.currentUser.uid,
+                userName: auth.currentUser.displayName,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                userEmail: auth.currentUser.email // Stored but not shown
             });
 
             currentMarkers = [];
@@ -292,39 +519,10 @@
             isMarking = false;
             document.getElementById('mark-area-button').textContent = 'Mark Area';
             alert('Project submitted successfully!');
+
+            loadUserProjects();
+            loadMarkersFromFirestore(); // Reload markers to show the new one
         });
 
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                document.getElementById('login-button').style.display = 'none';
-                document.getElementById('account-buttons').style.display = 'block';
-
-                document.getElementById('logout-button').addEventListener('click', () => {
-                    auth.signOut();
-                });
-
-                document.getElementById('delete-account-button').addEventListener('click', async () => {
-                    const user = auth.currentUser;
-                    if (user) {
-                        await user.delete();
-                        alert('Account deleted successfully.');
-                    }
-                });
-            } else {
-                document.getElementById('login-button').style.display = 'block';
-                document.getElementById('account-buttons').style.display = 'none';
-            }
-        });
-
-        document.getElementById('login-button').addEventListener('click', () => {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider).catch(error => {
-                console.error('Error during login:', error);
-            });
-        });
-
-        window.onload = initMap;
-    </script>
-</body>
-
-    </html>
+        async function deleteProjects(userId) {
+            const projectsSnapshot = await db.collection
