@@ -525,4 +525,17 @@
         });
 
         async function deleteProjects(userId) {
-            const projectsSnapshot = await db.collection
+            const projectsSnapshot = await db.collection("projects").where("userId", "==", userId).get();
+            const batch = db.batch();
+            projectsSnapshot.forEach(doc => {
+                batch.delete(doc.ref);
+                rtdb.ref('chatrooms/' + doc.id).remove(); // Remove chatroom data
+            });
+            await batch.commit();
+        }
+
+        window.onload = initMap;
+    </script>
+</body>
+
+</html>
