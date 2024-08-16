@@ -273,9 +273,10 @@
         let isMarking = false;
         let currentMarkers = [];
         let markerCount = 0;
-        const maxMarkers = 3; // Each user can have up to 3 active markers
+        const maxMarkers = 3;
         let userProjects = [];
         let activeChatroom = '';
+        let lastMessageTime = 0;
 
         function initMap() {
             map = L.map('map').setView([23.8103, 90.4125], 13);
@@ -284,7 +285,7 @@
                 attribution: '© OpenStreetMap contributors'
             }).addTo(map);
 
-            loadMarkersFromFirestore(); // Load markers on map initialization
+            loadMarkersFromFirestore();
 
             map.on('click', (e) => {
                 if (isMarking && markerCount < maxMarkers) {
@@ -326,13 +327,13 @@
                 case 'calligraphy':
                     return '#349beb';
                 case 'robbery_prevention':
-                    return '#ff0000'; // Bright red
+                    return '#ff0000';
                 case 'extortion_prevention':
-                    return '#ffff00'; // Bright yellow
+                    return '#ffff00';
                 case 'tree_plantation':
-                    return '#006400'; // Dark green
+                    return '#006400';
                 default:
-                    return '#000000'; // Default to black
+                    return '#000000';
             }
         }
 
@@ -345,26 +346,35 @@
                 loadUserProjects();
 
                 document.getElementById('logout-button').addEventListener('click', () => {
-                    auth.signOut();
+                    auth.signOut().then(() => location.reload());
                 });
 
                 document.getElementById('delete-account-button').addEventListener('click', async () => {
-                    try {
-                        await deleteProjects(user.uid);
-                        await user.delete();
-                        alert('Account and associated projects deleted successfully.');
-                    } catch (error) {
-                        if (error.code === 'auth/requires-recent-login') {
-                            alert('This operation is sensitive and requires recent authentication. Logout and then login again before trying to delete your account.');
-                        } else {
-                            console.error('Error deleting account:', error);
+                    if (confirm('Do you really want to delete your account? All of your active projects will also be removed.')) {
+                        try {
+                            await deleteProjects(user.uid);
+                            await user.delete();
+                            alert('Account and associated projects deleted successfully.');
+                            location.reload();
+                        } catch (error) {
+                            if (error.code === 'auth/requires-recent-login') {
+                                alert('This operation requires recent authentication. Logout and login again before trying to delete your account.');
+                            } else {
+                                console.error('Error deleting account:', error);
+                            }
                         }
                     }
                 });
+
+                document.getElementById('chatroom-input').disabled = false;
+                document.getElementById('chatroom-send').disabled = false;
             } else {
                 document.getElementById('login-button').style.display = 'block';
                 document.getElementById('account-buttons').style.display = 'none';
                 document.getElementById('project-list').style.display = 'none';
+
+                document.getElementById('chatroom-input').disabled = true;
+                document.getElementById('chatroom-send').disabled = true;
             }
         });
 
@@ -379,7 +389,7 @@
 
         document.getElementById('mark-area-button').addEventListener('click', () => {
             if (!auth.currentUser) {
-                alert('You must be logged in in order to submit');
+                alert('You must be logged in to perform this action.');
                 return;
             }
             isMarking = !isMarking;
@@ -435,6 +445,12 @@
         }
 
         async function createChatroom(projectName) {
+            const projectDoc = await db.collection("projects").doc(projectName).get();
+            if (!projectDoc.exists) {
+                alert("You should submit the project before messaging.");
+                return;
+            }
+
             const chatroomRef = rtdb.ref('chatrooms/' + projectName);
             chatroomRef.set({
                 createdAt: firebase.database.ServerValue.TIMESTAMP
@@ -453,7 +469,14 @@
 
         function loadChatMessages() {
             const chatroomRef = rtdb.ref('chatrooms/' + activeChatroom + '/messages');
-            chatroomRef.on('value', (snapshot) => {
+            chatroomRef.on('value', async (snapshot) => {
+                const projectDoc = await db.collection("projects").doc(activeChatroom).get();
+                if (!projectDoc.exists) {
+                    alert("This project doesn't exist anymore/ will exist after it's submitted.");
+                    document.getElementById('chatroom-container').style.display = 'none';
+                    return;
+                }
+
                 const messages = snapshot.val();
                 const chatroomMessages = document.getElementById('chatroom-messages');
                 chatroomMessages.innerHTML = '';
@@ -468,7 +491,17 @@
             });
         }
 
-        document.getElementById('chatroom-send').addEventListener('click', () => {
+        document.getElementById('chatroom-send').addEventListener('click', async () => {
+            const currentTime = Date.now();
+            if (currentTime - lastMessageTime < 1300) return;
+
+            const projectDoc = await db.collection("projects").doc(activeChatroom).get();
+            if (!projectDoc.exists) {
+                alert("This project doesn't exist anymore/ will exist after it's submitted.");
+                document.getElementById('chatroom-container').style.display = 'none';
+                return;
+            }
+
             const messageInput = document.getElementById('chatroom-input');
             const messageText = messageInput.value;
             if (messageText.trim() === '') return;
@@ -482,10 +515,12 @@
             });
 
             messageInput.value = '';
+            lastMessageTime = currentTime;
         });
 
         async function loadMarkersFromFirestore() {
             const snapshot = await db.collection("projects").get();
+            clearAllMarkers();
             snapshot.forEach(doc => {
                 const data = doc.data();
                 const location = data.location;
@@ -505,19 +540,28 @@
                                 ${auth.currentUser && auth.currentUser.uid === data.userId ? `<button class="delete-marker-btn" onclick="deleteMarker('${doc.id}', this)">Delete</button>` : ''}
                             </div>`)
                         .openPopup();
+
+                    currentMarkers.push(marker);
                 } else {
                     console.error('Invalid location data:', location);
                 }
             });
         }
 
+        function clearAllMarkers() {
+            currentMarkers.forEach(marker => {
+                map.removeLayer(marker.marker);
+            });
+            currentMarkers = [];
+        }
+
         async function deleteMarker(projectId, button) {
-            if (confirm('Are you sure you want to delete your project?')) { try {
+            if (confirm('Are you sure you want to delete your project?')) {
+                try {
                     await db.collection("projects").doc(projectId).delete();
-                    await rtdb.ref('chatrooms/' + projectId).remove(); // Delete chatroom data from RTDB
-                    const marker = button.closest('.leaflet-popup')._source;
-                    map.removeLayer(marker); // Remove marker from map
+                    await rtdb.ref('chatrooms/' + projectId).remove();
                     alert('Project and associated chatroom deleted successfully!');
+                    location.reload();
                 } catch (error) {
                     console.error('Error deleting marker:', error);
                 }
@@ -528,8 +572,8 @@
             e.preventDefault();
 
             if (!auth.currentUser) {
-                alert('You must be logged in in order to submit');
-                return;
+                alert('You must be logged in to perform this action.');
+                                return;
             }
 
             const projectName = document.getElementById('project-name').value;
@@ -556,7 +600,7 @@
                 userId: auth.currentUser.uid,
                 userName: auth.currentUser.displayName,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                userEmail: auth.currentUser.email // Stored but not shown
+                userEmail: auth.currentUser.email
             });
 
             currentMarkers = [];
@@ -566,7 +610,7 @@
             alert('Project submitted successfully!');
 
             loadUserProjects();
-            loadMarkersFromFirestore(); // Reload markers to show the new one
+            loadMarkersFromFirestore();
         });
 
         async function deleteProjects(userId) {
@@ -574,9 +618,10 @@
             const batch = db.batch();
             projectsSnapshot.forEach(doc => {
                 batch.delete(doc.ref);
-                rtdb.ref('chatrooms/' + doc.id).remove(); // Remove chatroom data
+                rtdb.ref('chatrooms/' + doc.id).remove();
             });
             await batch.commit();
+            location.reload();
         }
 
         window.onload = initMap;
@@ -584,3 +629,4 @@
 </body>
 
 </html>
+       
